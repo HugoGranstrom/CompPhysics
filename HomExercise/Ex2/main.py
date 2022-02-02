@@ -35,17 +35,33 @@ def f_high(r):
 def phi(r):
   return phi_high(r) * bode(0, r, f_low, N) + phi_low(r) * bode(r, r_max, f_high, N)
 
-t = np.linspace(0, r_max, 100)
+t = np.linspace(0, r_max, 200)
 
 y = np.array([phi(t[i]) for i in range(len(t))])
 yExact = phi_exact(t)
 
+plt.figure()
 plt.plot(t, y, label="Numerical")
-plt.plot(t, yExact, label="Exact")
+plt.plot(t, yExact, label="Exact", linestyle="dashed")
 plt.legend()
+plt.title(f"Comparison of numerical and exact solution (N = {N})")
+plt.xlabel("r")
+plt.ylabel("φ(r)")
+plt.savefig("phiSol.png")
 
-plt.show()
+plt.figure()
+upper_limit = int(200 / r_max * 3)
+plt.plot(t[:upper_limit], y[:upper_limit], label="Numerical")
+plt.plot(t[:upper_limit], yExact[:upper_limit], label="Exact", linestyle="dashed")
+plt.legend()
+plt.title(f"Comparison of numerical and exact solution (N = {N})")
+plt.xlabel("r")
+plt.ylabel("φ(r)")
+plt.savefig("phisolZoom.png")
 
+plt.figure()
 plt.semilogy(t, np.abs(y - yExact))
-
-plt.show()
+plt.xlabel("r")
+plt.ylabel("log(|φ - φ_exact|)")
+plt.title(f"Error of numerical solution (N = {N})")
+plt.savefig("phiError.png")
