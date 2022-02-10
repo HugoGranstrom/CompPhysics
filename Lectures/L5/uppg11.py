@@ -2,7 +2,7 @@ import math
 from uppg10 import *
 
 def gaussQuad(f, a, b, l):
-  abscissae = rootsFinder(lambda x: legendre(x, l), -1, 1, 1e-8)
+  abscissae = rootsFinder(lambda x: legendre(x, l), -1, 1, 1e-15)
   weights = [2 / ((1 - x*x) * legendreDeriv(x, l)**2) for x in abscissae]
   print("absc:", abscissae)
   print("weights:", weights)
