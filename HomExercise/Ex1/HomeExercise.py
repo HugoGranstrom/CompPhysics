@@ -58,37 +58,6 @@ y0 = np.array([1,0])
 N = 10000
 yexact = lambda x:np.cos(2*np.pi*x)
 pexact = lambda x:-np.sin(2*np.pi*x)*2*np.pi
-""" solrk2 = rk2(f,a,b,y0,N)
-solrk3 = rk3(f,a,b,y0,N) """
-""" solrk4 = rk4(f,a,b,y0,N)
-x = np.linspace(a,b,N)
-soly = solrk4[0,:]
-solp = solrk4[1,:]
-erry = abs(soly-yexact(x))
-errp = abs(solp-pexact(x))
-plt.subplot(2,1,1)
-plt.plot(x,solrk2[0,:],label="RK2")
-plt.plot(x,solrk3[0,:],label="RK3")
-plt.plot(x[-1000:],soly[-1000:],label="RK4")
-plt.plot(x[-1000:],yexact(x[-1000:]))
-plt.xlabel("t")
-plt.ylabel("y")
-plt.title("Solutions for t in range 0-40 of y")
-plt.subplot(2,1,2)
-plt.plot(x,solrk2[1,:],label="RK2")
-plt.plot(x,solrk3[1,:],label="RK3")
-plt.plot(x[-1000:],solp[-1000:],label="RK4")
-plt.plot(x[-1000:],pexact(x[-1000:]))
-plt.xlabel("t")
-plt.ylabel("p")
-plt.title("Solutions at t in range 0-40 of p")
-plt.suptitle("y and p calculated with Runge-Kutta 4 in the timerange 0-40")
-plt.tight_layout()
-plt.show()
-plt.plot(x,erry)
-plt.plot(x,errp)
-plt.show()
- """
 
 N = np.array([500*2**i for i in range(4)])
 h = (b-a)/N
