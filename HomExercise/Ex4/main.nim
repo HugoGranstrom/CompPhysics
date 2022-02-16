@@ -1,7 +1,6 @@
 import random
 import math
 import ggplotnim
-#randomize(1)
 proc step(pos: (float, float)): (float,float) = 
     let num = rand(3)
     if num == 0:
