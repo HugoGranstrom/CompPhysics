@@ -43,7 +43,7 @@ proc bisection*(f: proc (x: float): float,x0: float,x1: float, tol: float): floa
             a = c
             fa = fc
         elif fc == 0:
-            return fc
+            return c
         else:
             echo "Something went wrong in bisection!"
     return (a+b)/2
@@ -54,11 +54,13 @@ proc rootsFinder*(f: proc (x: float): float,a: float,b: float, tol: float): seq[
     const step = 0.01
     var x = a
     while x < b:
-        var temp = f(x)
-        if temp*currentValue < 0:
-            intervals.add((x-step,x))
-        currentValue = temp
-        x += step
+      echo x
+      var temp = f(x)
+      if temp*currentValue < 0:
+        echo "hah"
+        intervals.add((x-step,x))
+      currentValue = temp
+      x += step
     var roots: seq[float]
     for interval in intervals:
         roots.add(bisection(f, interval[0],interval[1],tol))
@@ -66,6 +68,7 @@ proc rootsFinder*(f: proc (x: float): float,a: float,b: float, tol: float): seq[
 
 proc gaussQuad*(f: proc (x: float): float, a, b: float, l: int): float =
   let abscissae = rootsFinder(proc (x: float): float = legendre(x, l), -1, 1, 1e-15) 
+  echo abscissae
   let weights = abscissae.mapIt(2 / ((1 - it*it) * legendreDeriv(it, l)^2))
   echo "weights: ", weights
   let new_f =
