@@ -25,8 +25,44 @@ ggplot(df, aes("x", "y")) +
   xlim(-1, 1) +
   ggsave("legendre.png") ]#
 
-proc rootsFinder(f: proc (x: float): float, a, b, tol: float): seq[float] =
-  discard
+proc bisection*(f: proc (x: float): float,x0: float,x1: float, tol: float): float =
+    var a = x0
+    var b = x1
+    var c: float
+    var fa = f(a)
+    var fb = f(b)
+    var fc: float
+    assert fa*fb < 0
+    while abs(b-a) > tol:
+        c = (a+b)/2
+        fc = f(c)
+        if fc*fa < 0:
+            b = c
+            fb = fc
+        elif fc*fb < 0:
+            a = c
+            fa = fc
+        elif fc == 0:
+            return fc
+        else:
+            echo "Something went wrong in bisection!"
+    return (a+b)/2
+
+proc rootsFinder*(f: proc (x: float): float,a: float,b: float, tol: float): seq[float] =
+    var intervals: seq[(float, float)]
+    var currentValue = f(a)
+    const step = 0.01
+    var x = a
+    while x < b:
+        var temp = f(x)
+        if temp*currentValue < 0:
+            intervals.add((x-step,x))
+        currentValue = temp
+        x += step
+    var roots: seq[float]
+    for interval in intervals:
+        roots.add(bisection(f, interval[0],interval[1],tol))
+    return roots
 
 proc gaussQuad*(f: proc (x: float): float, a, b: float, l: int): float =
   let abscissae = rootsFinder(proc (x: float): float = legendre(x, l), -1, 1, 1e-15) 
