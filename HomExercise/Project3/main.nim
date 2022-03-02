@@ -6,7 +6,7 @@ type
     data*: seq[float]
     J*, B*, T*: float 
 
-const kb = 1.38e-23
+const kb = 8.617e-5
 
 proc `[]`*(lattice: Lattice, row, col: int): float =
   # use modulus to wrap around periodic BC. 
@@ -49,29 +49,45 @@ proc calcHamiltonian*(lattice: Lattice): float =
 
 proc ising*(lattice: var Lattice, steps: int) =
   var hamiltonian = calcHamiltonian(lattice)
-  for step in 0 ..< steps:
+  var dE = 1e10
+  var iters: int
+  while abs(dE) > 1e-10 or iters < 100:
+    iters += 1
+    var innerHamiltonian = hamiltonian
     for row in 0 ..< lattice.height - 1:
       for col in 0 ..< lattice.width - 1:
         lattice.flip(row, col)
         let newHamiltonian = calcHamiltonian(lattice)
-        let dE = newHamiltonian - hamiltonian
-        if dE > 0:
+        let dEinner = newHamiltonian - innerhamiltonian
+        if dEinner > 0:
           let r = rand(1.0)
-          if r > exp(-dE / (lattice.T * kb)):
+          #if iters < 10: echo -dEinner / (lattice.T * kb)
+          if r > exp(-dEinner / (lattice.T * kb)):
+            #echo "Rejected! ", dEinner
             lattice.flip(row, col) # flip back
-            hamiltonian = newHamiltonian
         else:
-          hamiltonian = newHamiltonian
+          innerhamiltonian = newHamiltonian
+    dE = lattice.calcHamiltonian() - hamiltonian
+    #echo dE
+    hamiltonian = innerHamiltonian
+
+  echo "Iterations: ", iters
 
 proc main() =
-  let J = 0.004
-  let T = 300.0
+  let J = 0.000189574
+  let T = 2.2
   let B = 0.0
   randomize(10)
   var lattice = newLattice(10, 10, J, B, T)
-  echo lattice.data, " ", lattice.calcHamiltonian
+  echo lattice.calcHamiltonian
   ising(lattice, 100)
-  echo lattice.data, " ", lattice.calcHamiltonian
+  echo lattice.calcHamiltonian
 
   
 main()
+
+# c = kT/J (1 → 4)
+# t = 2.2 - 2.4
+# J = k*(2.2 → 2.4) / (1 → 4)
+# k * 2.2 / 1 → k*2.4 / 4 = k * 2.2 → k * 0.6
+
