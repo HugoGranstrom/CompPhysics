@@ -116,7 +116,7 @@ proc ising*(lattice: var Lattice): (float, float, float, float, float) =
 
 var modLock: Lock
 
-proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHeat: ptr UncheckedArray[float], avgSus: ptr UncheckedArray[float], avgCumul: ptr UncheckedArray[float], avgM: ptr UncheckedArray[float]): bool = 
+proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHeat: ptr UncheckedArray[float], avgSus: ptr UncheckedArray[float], avgCumul: ptr UncheckedArray[float], avgM: ptr UncheckedArray[float],latticeZise: int): bool = 
   randomize(task_id)
   for i in 0 ..< c_len:
     let c = cs[i]
@@ -126,7 +126,7 @@ proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHea
     #echo "c = ", c
     let B = 0.0
     
-    var lattice = newLattice(10, 10, J, B, T)
+    var lattice = newLattice(latticeZise, latticeZise, J, B, T)
     #echo lattice.calcHamiltonian
     let (M,msquare,m4,e,esquare) = ising(lattice)
     #echo lattice.calcHamiltonian
@@ -146,37 +146,102 @@ proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHea
 
 
 proc main() =
-  let c_len = 500
-  var avgheat: seq[float] = newSeq[float](c_len)
-  var avgsus: seq[float] = newSeq[float](c_len)
-  var avgcumul: seq[float] = newSeq[float](c_len)
-  var avgM: seq[float] = newSeq[float](c_len)
-  var cs = linspace(2.0,7.0,c_len)
-  let times_run = 100
 
+#SIZE 8
+  echo "Running for size 8"
+  let c_len = 30
+  var avgheat1: seq[float] = newSeq[float](c_len)
+  var avgsus1: seq[float] = newSeq[float](c_len)
+  var avgcumul1: seq[float] = newSeq[float](c_len)
+  var avgM1: seq[float] = newSeq[float](c_len)
+  var cs = linspace(2.0,10.0,c_len)
+  let times_run = 50
+  var latticeZise = 8
   var nthreads = countProcessors()
   var tp = Taskpool.new(num_threads = nthreads)
   var pendingTasks = newSeq[FlowVar[bool]](times_run)
   modLock.initLock
   for n in 0 ..< times_run:
-    pendingTasks[n] = tp.spawn thread_func(n, c_len, cast[ptr UncheckedArray[float]](cs[0].addr), cast[ptr UncheckedArray[float]](avgheat[0].addr), cast[ptr UncheckedArray[float]](avgsus[0].addr), cast[ptr UncheckedArray[float]](avgcumul[0].addr), cast[ptr UncheckedArray[float]](avgM[0].addr))
+    pendingTasks[n] = tp.spawn thread_func(n, c_len, cast[ptr UncheckedArray[float]](cs[0].addr), cast[ptr UncheckedArray[float]](avgheat1[0].addr), cast[ptr UncheckedArray[float]](avgsus1[0].addr), cast[ptr UncheckedArray[float]](avgcumul1[0].addr), cast[ptr UncheckedArray[float]](avgM1[0].addr),latticeZise)
   
   for n in 0 ..< times_run:
     discard sync pendingTasks[n]
 
   for i in 0 .. cs.high:
-    avgheat[i] /= float(times_run)
-    avgsus[i] /= float(times_run)
-    avgcumul[i] /= float(times_run)
-    avgM[i] /= float(times_run)
+    avgheat1[i] /= float(times_run)
+    avgsus1[i] /= float(times_run)
+    avgcumul1[i] /= float(times_run)
+    avgM1[i] /= float(times_run)
 
-  let df1 = seqsToDf({"c":cs,"magnetization":avgM})
-  let df2 = seqsToDf({"c":cs,"suseptibility":avgsus})
-  let df3 = seqsToDf({"c":cs, "cumulant":avgcumul})
-  let df4 = seqsToDf({"c":cs,"specific heat":avgheat})
-  ggplot(df1, aes("c","magnetization")) + geom_point() +  ggsave("mag.png")
-  ggplot(df2, aes("c","suseptibility")) + geom_point() +  ggsave("sus.png")
-  ggplot(df3, aes("c","cumulant")) + geom_point() +  ggsave("cumul.png")
-  ggplot(df4, aes("c","specific heat")) + geom_point() +  ggsave("heat.png")
+# SIZE 16
+  echo "Running for size 16"
+  var avgheat2: seq[float] = newSeq[float](c_len)
+  var avgsus2: seq[float] = newSeq[float](c_len)
+  var avgcumul2: seq[float] = newSeq[float](c_len)
+  var avgM2: seq[float] = newSeq[float](c_len)
+  latticeZise = 16
+  modLock.initLock
+  for n in 0 ..< times_run:
+    pendingTasks[n] = tp.spawn thread_func(n, c_len, cast[ptr UncheckedArray[float]](cs[0].addr), cast[ptr UncheckedArray[float]](avgheat2[0].addr), cast[ptr UncheckedArray[float]](avgsus2[0].addr), cast[ptr UncheckedArray[float]](avgcumul2[0].addr), cast[ptr UncheckedArray[float]](avgM2[0].addr),latticeZise)
+  
+  for n in 0 ..< times_run:
+    discard sync pendingTasks[n]
+
+  for i in 0 .. cs.high:
+    avgheat2[i] /= float(times_run)
+    avgsus2[i] /= float(times_run)
+    avgcumul2[i] /= float(times_run)
+    avgM2[i] /= float(times_run)
+
+# SIZE 32
+
+  echo "Running for size 32"
+  var avgheat3: seq[float] = newSeq[float](c_len)
+  var avgsus3: seq[float] = newSeq[float](c_len)
+  var avgcumul3: seq[float] = newSeq[float](c_len)
+  var avgM3: seq[float] = newSeq[float](c_len)
+  latticeZise = 32
+  modLock.initLock
+  for n in 0 ..< times_run:
+    pendingTasks[n] = tp.spawn thread_func(n, c_len, cast[ptr UncheckedArray[float]](cs[0].addr), cast[ptr UncheckedArray[float]](avgheat3[0].addr), cast[ptr UncheckedArray[float]](avgsus3[0].addr), cast[ptr UncheckedArray[float]](avgcumul3[0].addr), cast[ptr UncheckedArray[float]](avgM3[0].addr),latticeZise)
+  
+  for n in 0 ..< times_run:
+    discard sync pendingTasks[n]
+
+  for i in 0 .. cs.high:
+    avgheat3[i] /= float(times_run)
+    avgsus3[i] /= float(times_run)
+    avgcumul3[i] /= float(times_run)
+    avgM3[i] /= float(times_run)
+    
+  echo "Plotting"
+  var df1 = seqsToDf({"c":cs,"L=8":avgM1, "L=16":avgM2, "L=32":avgM3})
+  var df2 = seqsToDf({"c":cs,"L=8":avgsus1, "L=16":avgsus2,"L=32":avgsus3})
+  var df3 = seqsToDf({"c":cs, "L=8":avgcumul1,"L=16":avgcumul2,"L=32":avgcumul3})
+  var df4 = seqsToDf({"c":cs,"L=8":avgheat1,"L=16":avgheat2,"L=32":avgheat3})
+  df1 = df1.gather(["L=8","L=16","L=32"], key = "size", value="Magnitization")
+  df2 = df2.gather(["L=8","L=16","L=32"], key = "size", value="Suseptibility")
+  df3 = df3.gather(["L=8","L=16","L=32"], key = "size", value="Cumulant")
+  df4 = df4.gather(["L=8","L=16","L=32"], key = "size", value="Specific Heat")
+  ggplot(df1, aes("c","Magnitization",color = "size")) +
+    geom_point() +
+    geom_line() +
+    ggtitle("Magnitization") +
+    ggsave("mag.png")
+  ggplot(df2, aes("c","Suseptibility",color = "size")) +
+    geom_point() +
+    geom_line() +
+    ggtitle("Susceptability") +
+    ggsave("sus.png")
+  ggplot(df3, aes("c","Cumulant",color = "size")) +
+    geom_point() + 
+    geom_line() +
+    ggtitle("Cumulant") +
+    ggsave("cumul.png")
+  ggplot(df4, aes("c","Specific Heat",color = "size")) +
+    geom_point() +
+    geom_line() +
+    ggtitle("Specific Heat") +
+    ggsave("heat.png")
 
 main()
