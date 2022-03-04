@@ -1,4 +1,5 @@
 import math, random, sequtils, ggplotnim, numericalnim
+import locks, taskpools, cpuinfo
 
 type
   Lattice* = object
@@ -109,80 +110,73 @@ proc ising*(lattice: var Lattice): (float, float, float, float, float) =
   let m4 = mean(m4Tot)
   let e = mean(eTot)
   let esquare = mean(esquareTot)
-  echo "Iterations: ", iters
+  #echo "Iterations: ", iters
   return (M,msquare,m4,e,esquare)
   
 
-  
+var modLock: Lock
 
+proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHeat: ptr UncheckedArray[float], avgSus: ptr UncheckedArray[float], avgCumul: ptr UncheckedArray[float], avgM: ptr UncheckedArray[float]): bool = 
+  randomize(task_id)
+  for i in 0 ..< c_len:
+    let c = cs[i]
+    let T = J*c/kb
+    #let c = kb*T/J
+      
+    #echo "c = ", c
+    let B = 0.0
+    
+    var lattice = newLattice(10, 10, J, B, T)
+    #echo lattice.calcHamiltonian
+    let (M,msquare,m4,e,esquare) = ising(lattice)
+    #echo lattice.calcHamiltonian
+    let specHeat = Heat_calc(e,esquare,T)
+    let sus = Sus_calc(M,msquare,T)
+    let cumul = Cumulant(msquare,m4)
 
+    #echo "Specific heat = ", specHeat
+    #echo "Suseptibility = ", sus
+    #echo "Cumulant = ", cumul
+    #echo "Magnetization = ", M
+    withLock(modLock):
+      avgHeat[i] += specHeat
+      avgSus[i] += sus
+      avgCumul[i] += abs(cumul)
+      avgM[i] += abs(M)
 
 
 proc main() =
+  let c_len = 500
+  var avgheat: seq[float] = newSeq[float](c_len)
+  var avgsus: seq[float] = newSeq[float](c_len)
+  var avgcumul: seq[float] = newSeq[float](c_len)
+  var avgM: seq[float] = newSeq[float](c_len)
+  var cs = linspace(2.0,7.0,c_len)
+  let times_run = 100
 
-  var avgheat: seq[seq[float]]
-  var avgsus: seq[seq[float]]
-  var avgcumul: seq[seq[float]]
-  var avgM: seq[seq[float]]
-  let cs = linspace(1.0,7.0,150)
-  let times_run = 20
-  for avg in 0 ..< times_run:
-    var heattot: seq[float]
-    var sustot: seq[float]
-    var cumultot: seq[float]
-    var mTot: seq[float]
-    for c in cs:
-      #let c = 1.0
-      let T = J*c/kb
-      #let c = kb*T/J
-        
-      echo "c = ", c
-      let B = 0.0
-        
-      randomize(avg)
-      var lattice = newLattice(10, 10, J, B, T)
-      echo lattice.calcHamiltonian
-      let (M,msquare,m4,e,esquare) = ising(lattice)
-      echo lattice.calcHamiltonian
-      let specHeat = Heat_calc(e,esquare,T)
-      let sus = Sus_calc(M,msquare,T)
-      let cumul = Cumulant(msquare,m4)
-
-      echo "Specific heat = ", specHeat
-      echo "Suseptibility = ", sus
-      echo "Cumulant = ", cumul
-      echo "Magnetization = ", M
-      heattot.add specHeat
-      sustot.add sus
-      cumultot.add abs(cumul)
-      mTot.add abs(M)
-    avgheat.add heattot
-    avgsus.add sustot
-    avgcumul.add cumultot
-    avgM.add mTot
+  var nthreads = countProcessors()
+  var tp = Taskpool.new(num_threads = nthreads)
+  var pendingTasks = newSeq[FlowVar[bool]](times_run)
+  modLock.initLock
+  for n in 0 ..< times_run:
+    pendingTasks[n] = tp.spawn thread_func(n, c_len, cast[ptr UncheckedArray[float]](cs[0].addr), cast[ptr UncheckedArray[float]](avgheat[0].addr), cast[ptr UncheckedArray[float]](avgsus[0].addr), cast[ptr UncheckedArray[float]](avgcumul[0].addr), cast[ptr UncheckedArray[float]](avgM[0].addr))
   
-  var avg2heat: seq[float] = newseq[float](cs.len)
-  var avg2sus: seq[float] = newseq[float](cs.len)
-  var avg2cumul: seq[float] = newseq[float](cs.len)
-  var avg2M: seq[float] = newseq[float](cs.len)
-  for i in 0 .. cs.high:
-    for j in 0 ..< times_run:
-      avg2heat[i] += avgheat[j][i]
-      avg2sus[i] += avgsus[j][i]
-      avg2cumul[i] += avgcumul[j][i]
-      avg2M[i] += avgM[j][i]
-    avg2heat[i] /= float(times_run)
-    avg2sus[i] /= float(times_run)
-    avg2cumul[i] /= float(times_run)
-    avg2M[i] /= float(times_run)
+  for n in 0 ..< times_run:
+    discard sync pendingTasks[n]
 
-  let df1 = seqsToDf({"c":cs,"magnetization":avg2M})
-  let df2 = seqsToDf({"c":cs,"suseptibility":avg2sus})
-  let df3 = seqsToDf({"c":cs, "cumulant":avg2cumul})
-  let df4 = seqsToDf({"c":cs,"specific heat":avg2heat})
-  ggplot(df1, aes("c","magnetization")) + geom_point() + geom_smooth(smoother="poly") + ggsave("mag.png")
-  ggplot(df2, aes("c","suseptibility")) + geom_point() + geom_smooth(smoother="poly") + ggsave("sus.png")
-  ggplot(df3, aes("c","cumulant")) + geom_point() + geom_smooth(smoother="poly") + ggsave("cumul.png")
-  ggplot(df4, aes("c","specific heat")) + geom_point() + geom_smooth(smoother="poly") + ggsave("heat.png")
+  for i in 0 .. cs.high:
+    avgheat[i] /= float(times_run)
+    avgsus[i] /= float(times_run)
+    avgcumul[i] /= float(times_run)
+    avgM[i] /= float(times_run)
+
+  let df1 = seqsToDf({"c":cs,"magnetization":avgM})
+  let df2 = seqsToDf({"c":cs,"suseptibility":avgsus})
+  let df3 = seqsToDf({"c":cs, "cumulant":avgcumul})
+  let df4 = seqsToDf({"c":cs,"specific heat":avgheat})
+  ggplot(df1, aes("c","magnetization")) + geom_point() +  ggsave("mag.png")
+  ggplot(df2, aes("c","suseptibility")) + geom_point() +  ggsave("sus.png")
+  ggplot(df3, aes("c","cumulant")) + geom_point() +  ggsave("cumul.png")
+  ggplot(df4, aes("c","specific heat")) + geom_point() +  ggsave("heat.png")
 
 main()
