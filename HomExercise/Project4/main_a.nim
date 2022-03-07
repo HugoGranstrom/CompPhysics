@@ -120,6 +120,11 @@ proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHea
   randomize(task_id)
   for i in 0 ..< c_len:
     let c = cs[i]
+
+    if c/(float(int(c))) - 1 < 0.01:
+      echo c
+
+
     let T = J*c/kb
     #let c = kb*T/J
       
@@ -149,13 +154,13 @@ proc main() =
 
 #SIZE 8
   echo "Running for size 8"
-  let c_len = 30
+  let c_len = 50
   var avgheat1: seq[float] = newSeq[float](c_len)
   var avgsus1: seq[float] = newSeq[float](c_len)
   var avgcumul1: seq[float] = newSeq[float](c_len)
   var avgM1: seq[float] = newSeq[float](c_len)
   var cs = linspace(2.0,10.0,c_len)
-  let times_run = 50
+  let times_run = 100
   var latticeZise = 8
   var nthreads = countProcessors()
   var tp = Taskpool.new(num_threads = nthreads)
