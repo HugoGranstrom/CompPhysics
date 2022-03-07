@@ -154,13 +154,13 @@ proc main() =
 
 #SIZE 8
   echo "Running for size 8"
-  let c_len = 50
+  let c_len = 10
   var avgheat1: seq[float] = newSeq[float](c_len)
   var avgsus1: seq[float] = newSeq[float](c_len)
   var avgcumul1: seq[float] = newSeq[float](c_len)
   var avgM1: seq[float] = newSeq[float](c_len)
   var cs = linspace(2.0,10.0,c_len)
-  let times_run = 100
+  let times_run = 20
   var latticeZise = 8
   var nthreads = countProcessors()
   var tp = Taskpool.new(num_threads = nthreads)
@@ -220,6 +220,8 @@ proc main() =
     avgM3[i] /= float(times_run)
     
   echo "Plotting"
+  var dfall = seqsToDf({"c":cs,"L=8M1":avgM1, "L=16M1":avgM2, "L=32M1":avgM3,"L=8S1":avgsus1, "L=16S2":avgsus2,"L=32S3":avgsus3,
+ "L=8Cu1":avgcumul1,"L=16Cu2":avgcumul2,"L=32Cu3":avgcumul3, "L=8H1":avgheat1,"L=16H2":avgheat2,"L=32H3":avgheat3})
   var df1 = seqsToDf({"c":cs,"L=8":avgM1, "L=16":avgM2, "L=32":avgM3})
   var df2 = seqsToDf({"c":cs,"L=8":avgsus1, "L=16":avgsus2,"L=32":avgsus3})
   var df3 = seqsToDf({"c":cs, "L=8":avgcumul1,"L=16":avgcumul2,"L=32":avgcumul3})
@@ -248,5 +250,6 @@ proc main() =
     geom_line() +
     ggtitle("Specific Heat") +
     ggsave("heat.png")
+  dfall.writeCsv("test.csv")
 
 main()
