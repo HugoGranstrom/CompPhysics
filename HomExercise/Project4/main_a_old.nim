@@ -25,20 +25,20 @@ proc `[]=`*(lattice: var Lattice, row, col: int, val: float) =
 proc flip*(lattice: var Lattice, row, col: int) =
   lattice[row, col] = lattice[row, col] * -1.0
 
-proc newLattice*(height, width: int, J, B, T: float, rnd: var Rand): Lattice =
+proc newLattice*(height, width: int, J, B, T: float): Lattice =
   result.height = height
   result.width = width
   result.J = J
   result.B = B
   result.T = T
-  result.data = newSeqWith[float]((height-1)*(width-1), rnd.sample([-1.0, 1.0]))
+  result.data = newSeqWith[float]((height-1)*(width-1), sample([-1.0, 1.0]))
 
 
 proc calcHamiltonian(lattice: Lattice, row, col: int): float =
   let current = lattice[row, col]
-  #result += current * lattice[row-1, col] #
+  result += current * lattice[row-1, col] #
   result += current * lattice[row+1, col]
-  #result += current * lattice[row, col-1] #
+  result += current * lattice[row, col-1] #
   result += current * lattice[row, col+1]
 
 proc calcHamiltonian*(lattice: Lattice): float =
@@ -47,7 +47,7 @@ proc calcHamiltonian*(lattice: Lattice): float =
   for row in 0 ..< lattice.height - 1:
     for col in 0 ..< lattice.width - 1:
       pairsSum += calcHamiltonian(lattice, row, col)
-  result += 2 * -lattice.J * pairsSum
+  result += -lattice.J * pairsSum
 
 proc M_calc(lattice: Lattice): float =
   return sum(lattice.data)/lattice.data.len.toFloat
@@ -63,6 +63,7 @@ proc Cumulant(mSquare: float, m4: float): float =
 
 proc mean(x: seq[float]): float =
   return sum(x)/x.len.float
+
 
 proc normSpace(xmin: float, xmax:float, xsum:int, xsize:float, xmid:float): seq[float] =
   
@@ -84,18 +85,17 @@ proc normSpace(xmin: float, xmax:float, xsum:int, xsize:float, xmid:float): seq[
   var coarse1:seq[float]
   var coarse2:seq[float]
   var fine:seq[float]
-  var n1:int = int(c1*(xsum/2))
-  var n2:int = int(c2*(xsum/2))
-  var n3:int = int(xsum/2)
-  var n4:int = xsum-n1-n2-n3
-  if n1 != 0:
-    coarse1 = linspace(xmin,(xmid-(xsize/2))-0.000001,int(c1*(xsum/2)))
-  if n2 != 0:
-    coarse2 = linspace(xmid+(xsize/2)+0.0000001, xmax,int(c2*(xsum/2)))
-  fine = linspace((xmid-(xsize/2)), xmid+(xsize/2), n3+n4)
+  if int(c1*(xsum/2)) != 0:
+    coarse1 = linspace(xmin,(xmid-(xsize/2)),int(c1*(xsum/2)))
+  if int(c2*(xsum/2)) != 0:
+    coarse2 = linspace((xmid-(xsize/2)), xmid+(xsize/2),int(c2*(xsum/2)))
+  fine = linspace((xmid-(xsize/2)), xmid+(xsize/2), int(xsum/2))
   return concat(coarse1,fine,coarse2)
 
-proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, float) =
+
+
+
+proc ising*(lattice: var Lattice): (float, float, float, float, float) =
   var hamiltonian = calcHamiltonian(lattice)
   var dE = 1e10
   var iters: int
@@ -113,7 +113,7 @@ proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, f
         let newHamiltonian = calcHamiltonian(lattice)
         let dEinner = newHamiltonian - innerhamiltonian
         if dEinner > 0:
-          let r = rnd.rand(1.0)
+          let r = rand(1.0)
           #if iters < 10: echo -dEinner / (lattice.T * kb)
           if r > exp(-dEinner / (lattice.T * kb)):
             #echo "Rejected! ", dEinner
@@ -148,20 +148,23 @@ proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, f
 var modLock: Lock
 
 proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHeat: ptr UncheckedArray[float], avgSus: ptr UncheckedArray[float], avgCumul: ptr UncheckedArray[float], avgM: ptr UncheckedArray[float],latticeZise: int): bool = 
-  var rnd = initRand(task_id)
+  randomize(task_id)
+  echo "THREADFUNC!!!!"
   for i in 0 ..< c_len:
+    echo "ITERATION: ",i
     let c = cs[i]
-
 
     let T = J*c/kb
     #let c = kb*T/J
       
     #echo "c = ", c
-    let B = 0.0001
+    let B = 0.001
     
-    var lattice = newLattice(latticeZise, latticeZise, J, B, T, rnd)
+    var lattice = newLattice(latticeZise, latticeZise, J, B, T)
     #echo lattice.calcHamiltonian
-    let (M,msquare,m4,e,esquare) = ising(lattice, rnd)
+    echo "Innan Ising"
+    let (M,msquare,m4,e,esquare) = ising(lattice)
+    echo "Efter Isiag"
     #echo lattice.calcHamiltonian
     let specHeat = Heat_calc(e,esquare,T)
     let sus = Sus_calc(M,msquare,T)
@@ -171,24 +174,27 @@ proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHea
     #echo "Suseptibility = ", sus
     #echo "Cumulant = ", cumul
     #echo "Magnetization = ", M
+    echo "INNAN LOCK"
     withLock(modLock):
       avgHeat[i] += specHeat
       avgSus[i] += sus
       avgCumul[i] += abs(cumul)
       avgM[i] += abs(M)
+    echo "EFTER LOCK"
 
 
 proc main() =
 
 #SIZE 8
   echo "Running for size 8"
-  let c_len = 10
+  let c_len = 20
   var avgheat1: seq[float] = newSeq[float](c_len)
   var avgsus1: seq[float] = newSeq[float](c_len)
   var avgcumul1: seq[float] = newSeq[float](c_len)
   var avgM1: seq[float] = newSeq[float](c_len)
-  var cs = linspace(-10,-0.1,c_len)
-  let times_run = 4
+  #randomize()
+  var cs = linspace(-10,-0.1,10)
+  let times_run = 20
   var latticeZise = 8
   var nthreads = countProcessors()
   var tp = Taskpool.new(num_threads = nthreads)
