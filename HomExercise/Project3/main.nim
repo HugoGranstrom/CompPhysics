@@ -36,9 +36,9 @@ proc newLattice*(height, width: int, J, B, T: float): Lattice =
 
 proc calcHamiltonian(lattice: Lattice, row, col: int): float =
   let current = lattice[row, col]
-  result += current * lattice[row-1, col] #
+  #result += current * lattice[row-1, col] #
   result += current * lattice[row+1, col]
-  result += current * lattice[row, col-1] #
+  #result += current * lattice[row, col-1] #
   result += current * lattice[row, col+1]
 
 proc calcHamiltonian*(lattice: Lattice): float =
@@ -47,7 +47,7 @@ proc calcHamiltonian*(lattice: Lattice): float =
   for row in 0 ..< lattice.height - 1:
     for col in 0 ..< lattice.width - 1:
       pairsSum += calcHamiltonian(lattice, row, col)
-  result += -lattice.J * pairsSum
+  result += 2 * -lattice.J * pairsSum
 
 proc M_calc(lattice: Lattice): float =
   return sum(lattice.data)/lattice.data.len.toFloat
@@ -212,6 +212,7 @@ proc main() =
   
   for n in 0 ..< times_run:
     discard sync pendingTasks[n]
+    echo "Progress: ", 100 * (n+1) / times_run, "%" 
 
   for i in 0 .. cs.high:
     avgheat3[i] /= float(times_run)
