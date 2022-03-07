@@ -25,13 +25,13 @@ proc `[]=`*(lattice: var Lattice, row, col: int, val: float) =
 proc flip*(lattice: var Lattice, row, col: int) =
   lattice[row, col] = lattice[row, col] * -1.0
 
-proc newLattice*(height, width: int, J, B, T: float): Lattice =
+proc newLattice*(height, width: int, J, B, T: float, rnd: var Rand): Lattice =
   result.height = height
   result.width = width
   result.J = J
   result.B = B
   result.T = T
-  result.data = newSeqWith[float]((height-1)*(width-1), sample([-1.0, 1.0]))
+  result.data = newSeqWith[float]((height-1)*(width-1), rnd.sample([-1.0, 1.0]))
 
 
 proc calcHamiltonian(lattice: Lattice, row, col: int): float =
@@ -64,7 +64,7 @@ proc Cumulant(mSquare: float, m4: float): float =
 proc mean(x: seq[float]): float =
   return sum(x)/x.len.float
 
-proc ising*(lattice: var Lattice): (float, float, float, float, float) =
+proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, float) =
   var hamiltonian = calcHamiltonian(lattice)
   var dE = 1e10
   var iters: int
@@ -82,7 +82,7 @@ proc ising*(lattice: var Lattice): (float, float, float, float, float) =
         let newHamiltonian = calcHamiltonian(lattice)
         let dEinner = newHamiltonian - innerhamiltonian
         if dEinner > 0:
-          let r = rand(1.0)
+          let r = rnd.rand(1.0)
           #if iters < 10: echo -dEinner / (lattice.T * kb)
           if r > exp(-dEinner / (lattice.T * kb)):
             #echo "Rejected! ", dEinner
@@ -117,7 +117,7 @@ proc ising*(lattice: var Lattice): (float, float, float, float, float) =
 var modLock: Lock
 
 proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHeat: ptr UncheckedArray[float], avgSus: ptr UncheckedArray[float], avgCumul: ptr UncheckedArray[float], avgM: ptr UncheckedArray[float],latticeZise: int): bool = 
-  randomize(task_id)
+  var rnd = initRand(task_id)
   for i in 0 ..< c_len:
     let c = cs[i]
 
@@ -131,9 +131,9 @@ proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHea
     #echo "c = ", c
     let B = 0.0
     
-    var lattice = newLattice(latticeZise, latticeZise, J, B, T)
+    var lattice = newLattice(latticeZise, latticeZise, J, B, T, rnd)
     #echo lattice.calcHamiltonian
-    let (M,msquare,m4,e,esquare) = ising(lattice)
+    let (M,msquare,m4,e,esquare) = ising(lattice, rnd)
     #echo lattice.calcHamiltonian
     let specHeat = Heat_calc(e,esquare,T)
     let sus = Sus_calc(M,msquare,T)
