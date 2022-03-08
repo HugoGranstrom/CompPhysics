@@ -41,13 +41,21 @@ proc calcHamiltonian(lattice: Lattice, row, col: int): float =
   #result += current * lattice[row, col-1] #
   result += current * lattice[row, col+1]
 
+proc calcHamiltonianFull(lattice: Lattice, row, col: int): float =
+  let current = lattice[row, col]
+  result += current * lattice[row-1, col] #
+  result += current * lattice[row+1, col]
+  result += current * lattice[row, col-1] #
+  result += current * lattice[row, col+1]
+
+
 proc calcHamiltonian*(lattice: Lattice): float =
   result = -lattice.B * sum(lattice.data)
   var pairsSum: float
   for row in 0 ..< lattice.height - 1:
     for col in 0 ..< lattice.width - 1:
       pairsSum += calcHamiltonian(lattice, row, col)
-  result += 2 * -lattice.J * pairsSum
+  result += -lattice.J * pairsSum
 
 proc M_calc(lattice: Lattice): float =
   return sum(lattice.data)/lattice.data.len.toFloat
@@ -75,22 +83,23 @@ proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, f
   var m4Tot: seq[float]
   while abs(dE) > 1e-10 or iters < 100:
     iters += 1
-    var innerHamiltonian = hamiltonian
+    #var innerHamiltonian = hamiltonian
     for row in 0 ..< lattice.height - 1:
       for col in 0 ..< lattice.width - 1:
+        let energyBefore = calcHamiltonianFull(lattice, row, col)
         lattice.flip(row, col)
-        let newHamiltonian = calcHamiltonian(lattice)
-        let dEinner = newHamiltonian - innerhamiltonian
+        let energyDiff = -lattice.J*(calcHamiltonianFull(lattice, row, col) - energyBefore)
+        #let newHamiltonian = calcHamiltonian(lattice)
+        #let dEinner = newHamiltonian - innerhamiltonian
+        let dEinner = energyDiff
+        #echo "Full: ", deInner, " Local: ", energyDiff, " Rel err: ", (energyDiff - deInner) / deInner
         if dEinner > 0:
           let r = rnd.rand(1.0)
           #if iters < 10: echo -dEinner / (lattice.T * kb)
           if r > exp(-dEinner / (lattice.T * kb)):
             #echo "Rejected! ", dEinner
             lattice.flip(row, col) # flip back
-          else:
-            innerHamiltonian = newHamiltonian
-        else:
-          innerhamiltonian = newHamiltonian
+    let innerHamiltonian = lattice.calcHamiltonian
     if iters > 50:
       let M = M_calc(lattice)
       let msquare = M*M
@@ -121,10 +130,6 @@ proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHea
   for i in 0 ..< c_len:
     let c = cs[i]
 
-    if c/(float(int(c))) - 1 < 0.01:
-      echo c
-
-
     let T = J*c/kb
     #let c = kb*T/J
       
@@ -154,13 +159,13 @@ proc main() =
 
 #SIZE 8
   echo "Running for size 8"
-  let c_len = 10
+  let c_len = 40
   var avgheat1: seq[float] = newSeq[float](c_len)
   var avgsus1: seq[float] = newSeq[float](c_len)
   var avgcumul1: seq[float] = newSeq[float](c_len)
   var avgM1: seq[float] = newSeq[float](c_len)
-  var cs = linspace(2.0,10.0,c_len)
-  let times_run = 20
+  var cs = linspace(1.0,6.0,c_len)
+  let times_run = 6 * 1 # 550 = 7h
   var latticeZise = 8
   var nthreads = countProcessors()
   var tp = Taskpool.new(num_threads = nthreads)
