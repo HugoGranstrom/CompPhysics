@@ -54,10 +54,10 @@ proc rootsFinder*(f: proc (x: float): float,a: float,b: float, tol: float): seq[
     const step = 0.01
     var x = a
     while x < b:
-      echo x
+      #echo x
       var temp = f(x)
       if temp*currentValue < 0:
-        echo "hah"
+        #echo "hah"
         intervals.add((x-step,x))
       currentValue = temp
       x += step
@@ -68,9 +68,9 @@ proc rootsFinder*(f: proc (x: float): float,a: float,b: float, tol: float): seq[
 
 proc gaussQuad*(f: proc (x: float): float, a, b: float, l: int): float =
   let abscissae = rootsFinder(proc (x: float): float = legendre(x, l), -1, 1, 1e-15) 
-  echo abscissae
+  #echo abscissae
   let weights = abscissae.mapIt(2 / ((1 - it*it) * legendreDeriv(it, l)^2))
-  echo "weights: ", weights
+  #echo "weights: ", weights
   let new_f =
     proc (t: float): float =
       return (b - a) / 2 * f((t+1)*(b-a)/2 + a)
