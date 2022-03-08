@@ -24,12 +24,11 @@ proc `[]=`*(lattice: var Lattice, row, col: int, val: float) =
 proc flip*(lattice: var Lattice, row, col: int) =
   lattice[row, col] = lattice[row, col] * -1.0
 
-proc newLattice*(height, width: int, J, B, T: float, rnd: var Rand): Lattice =
+proc newLattice*(height, width: int, J, B: float, rnd: var Rand): Lattice =
   result.height = height
   result.width = width
   result.J = J
   result.B = B
-  result.T = T
   result.data = newSeqWith[float]((height-1)*(width-1), rnd.sample([-1.0, 1.0]))
 
 
@@ -76,14 +75,12 @@ const mcIterations = 10000
 proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, float) =
   var hamiltonian = calcHamiltonian(lattice)
   var dE = 1e10
-  var iters: int
   var eTot: seq[float]
   var mTot: seq[float]
   var msquareTot: seq[float]
   var esquareTot: seq[float]
   var m4Tot: seq[float]
-  while abs(dE) > 1e-10 or iters <= mcIterations:
-    iters += 1
+  for iters in 0 .. mcIterations:
     #var innerHamiltonian = hamiltonian
     for row in 0 ..< lattice.height - 1:
       for col in 0 ..< lattice.width - 1:
@@ -101,7 +98,7 @@ proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, f
             #echo "Rejected! ", dEinner
             lattice.flip(row, col) # flip back
     let innerHamiltonian = lattice.calcHamiltonian
-    if iters > 50:
+    if iters > 3000 and iters mod 100 == 0:
       let M = M_calc(lattice)
       let msquare = M*M
       let m4 = msquare*msquare
