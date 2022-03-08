@@ -1,4 +1,4 @@
-import math, random, sequtils, ggplotnim, numericalnim
+import math, random, sequtils, ggplotnim, numericalnim, algorithm
 import locks, taskpools, cpuinfo
 import ../utils
 const J = -0.000189574
@@ -6,7 +6,9 @@ const J = -0.000189574
 var modLock: Lock
 
 proc thread_func*(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHeat: ptr UncheckedArray[float], avgSus: ptr UncheckedArray[float], avgCumul: ptr UncheckedArray[float], avgM: ptr UncheckedArray[float],latticeZise: int): bool = 
+  let B = 0.0001
   var rnd = initRand(task_id)
+  var lattice = newLattice(latticeZise, latticeZise, J, B, rnd)
   for i in 0 ..< c_len:
     let c = cs[i]
 
@@ -15,9 +17,8 @@ proc thread_func*(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHe
     #let c = kb*T/J
       
     #echo "c = ", c
-    let B = 0.0001
     
-    var lattice = newLattice(latticeZise, latticeZise, J, B, T, rnd)
+    lattice.T = T
     #echo lattice.calcHamiltonian
     let (M,msquare,m4,e,esquare) = ising(lattice, rnd)
     #echo lattice.calcHamiltonian
@@ -40,13 +41,13 @@ proc main() =
 
 #SIZE 8
   echo "Running for size 8"
-  let c_len = 10
+  let c_len = 20
   var avgheat1: seq[float] = newSeq[float](c_len)
   var avgsus1: seq[float] = newSeq[float](c_len)
   var avgcumul1: seq[float] = newSeq[float](c_len)
   var avgM1: seq[float] = newSeq[float](c_len)
-  var cs = linspace(-6,-0.1,c_len)
-  let times_run = 4
+  var cs = linspace(-6,-0.5,c_len).reversed
+  let times_run = 40
   var latticeZise = 8
   var nthreads = countProcessors()
   var tp = Taskpool.new(num_threads = nthreads)
