@@ -48,6 +48,14 @@ proc calcHamiltonian*(lattice: Lattice): float =
       pairsSum += calcHamiltonian(lattice, row, col)
   result += -lattice.J * pairsSum
 
+proc calcHamiltonianFull(lattice: Lattice, row, col: int): float =
+  let current = lattice[row, col]
+  result += current * lattice[row-1, col] #
+  result += current * lattice[row+1, col]
+  result += current * lattice[row, col-1] #
+  result += current * lattice[row, col+1]
+  result = -lattice.B * current + -lattice.J * result
+
 proc M_calc*(lattice: Lattice): float =
   return sum(lattice.data)/lattice.data.len.toFloat
 
@@ -74,22 +82,23 @@ proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, f
   var m4Tot: seq[float]
   while abs(dE) > 1e-10 or iters < 100:
     iters += 1
-    var innerHamiltonian = hamiltonian
+    #var innerHamiltonian = hamiltonian
     for row in 0 ..< lattice.height - 1:
       for col in 0 ..< lattice.width - 1:
+        let energyBefore = calcHamiltonianFull(lattice, row, col)
         lattice.flip(row, col)
-        let newHamiltonian = calcHamiltonian(lattice)
-        let dEinner = newHamiltonian - innerhamiltonian
+        let energyDiff = calcHamiltonianFull(lattice, row, col) - energyBefore
+        #let newHamiltonian = calcHamiltonian(lattice)
+        #let dEinner = newHamiltonian - innerhamiltonian
+        let dEinner = energyDiff
+        #echo "Full: ", deInner, " Local: ", energyDiff, " Rel err: ", (energyDiff - deInner) / deInner
         if dEinner > 0:
           let r = rnd.rand(1.0)
           #if iters < 10: echo -dEinner / (lattice.T * kb)
           if r > exp(-dEinner / (lattice.T * kb)):
             #echo "Rejected! ", dEinner
             lattice.flip(row, col) # flip back
-          else:
-            innerHamiltonian = newHamiltonian
-        else:
-          innerhamiltonian = newHamiltonian
+    let innerHamiltonian = lattice.calcHamiltonian
     if iters > 50:
       let M = M_calc(lattice)
       let msquare = M*M
