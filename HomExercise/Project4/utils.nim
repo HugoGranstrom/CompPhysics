@@ -71,6 +71,8 @@ proc Cumulant*(mSquare: float, m4: float): float =
 proc mean*(x: seq[float]): float =
   return sum(x)/x.len.float
 
+const mcIterations = 10000
+
 proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, float) =
   var hamiltonian = calcHamiltonian(lattice)
   var dE = 1e10
@@ -80,7 +82,7 @@ proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, f
   var msquareTot: seq[float]
   var esquareTot: seq[float]
   var m4Tot: seq[float]
-  while abs(dE) > 1e-10 or iters < 100:
+  while abs(dE) > 1e-10 or iters <= mcIterations:
     iters += 1
     #var innerHamiltonian = hamiltonian
     for row in 0 ..< lattice.height - 1:
@@ -122,3 +124,64 @@ proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, f
   return (M,msquare,m4,e,esquare)
   
 
+proc calcProbability*(lattice: Lattice, row, col: int): float =
+  let beta = 1 / (kb * lattice.T)
+  let s = lattice[row-1, col] + lattice[row, col-1] + lattice[row, col+1] + lattice[row+1, col]
+  let e = exp(2 * lattice.J * beta * s)
+  result = e / (1 + e)
+
+proc isingHeatBath*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, float) =
+  var hamiltonian = calcHamiltonian(lattice)
+  var dE = 1e10
+  var iters: int
+  var eTot: seq[float]
+  var mTot: seq[float]
+  var msquareTot: seq[float]
+  var esquareTot: seq[float]
+  var m4Tot: seq[float]
+  while abs(dE) > 1e-10 or iters < mcIterations:
+    iters += 1
+    var innerHamiltonian = hamiltonian
+    for row in 0 ..< lattice.height - 1:
+      for col in 0 ..< lattice.width - 1:
+        let p = calcProbability(lattice, row, col)
+        let r = rnd.rand(1.0)
+        if r < p:
+          lattice[row, col] = 1
+        else:
+          lattice[row, col] = -1
+        #[ lattice.flip(row, col)
+        let newHamiltonian = calcHamiltonian(lattice)
+        let dEinner = newHamiltonian - innerhamiltonian
+        if dEinner > 0:
+          let r = rnd.rand(1.0)
+          #if iters < 10: echo -dEinner / (lattice.T * kb)
+          if r > exp(-dEinner / (lattice.T * kb)):
+            #echo "Rejected! ", dEinner
+            lattice.flip(row, col) # flip back
+          else:
+            innerHamiltonian = newHamiltonian
+        else:
+          innerhamiltonian = newHamiltonian ]#
+    if iters > 50:
+      innerHamiltonian = calcHamiltonian(lattice)
+      let M = M_calc(lattice)
+      let msquare = M*M
+      let m4 = msquare*msquare
+      let esquare = innerHamiltonian*innerHamiltonian
+      eTot.add innerHamiltonian
+      mTot.add M
+      msquareTot.add msquare
+      esquareTot.add esquare
+      m4Tot.add m4
+    
+    dE = innerHamiltonian - hamiltonian
+    
+    hamiltonian = innerHamiltonian
+  let M = mean(mTot)
+  let msquare = mean(msquareTot)
+  let m4 = mean(m4Tot)
+  let e = mean(eTot)
+  let esquare = mean(esquareTot)
+  
+  return (M,msquare,m4,e,esquare)
