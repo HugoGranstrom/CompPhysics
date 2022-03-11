@@ -1,7 +1,7 @@
 # Gaussian quadrature - Legendre Polynomials
 # Root finder
 import std/[sequtils, math]
-#import numericalnim, ggplotnim
+import numericalnim
 
 
 proc legendre*(x: float, l: int): float =
@@ -77,3 +77,8 @@ proc gaussQuad*(f: proc (x: float): float, a, b: float, l: int): float =
   for (x, w) in zip(abscissae, weights):
     result += w * new_f(x)
 
+proc geomspace*(a, b: float, n: int): seq[float] =
+  let exponent_a = log10(a)
+  let exponent_b = log10(b)
+  let l = linspace(exponent_a, exponent_b, n)
+  result = l.mapIt(pow(10.0, it))
