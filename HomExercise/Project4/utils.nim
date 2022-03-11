@@ -130,15 +130,12 @@ proc calcProbability*(lattice: Lattice, row, col: int): float =
 proc isingHeatBath*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, float) =
   var hamiltonian = calcHamiltonian(lattice)
   var dE = 1e10
-  var iters: int
   var eTot: seq[float]
   var mTot: seq[float]
   var msquareTot: seq[float]
   var esquareTot: seq[float]
   var m4Tot: seq[float]
-  while abs(dE) > 1e-10 or iters < mcIterations:
-    iters += 1
-    var innerHamiltonian = hamiltonian
+  for iters in 0 .. mcIterations:
     for row in 0 ..< lattice.height - 1:
       for col in 0 ..< lattice.width - 1:
         let p = calcProbability(lattice, row, col)
@@ -147,21 +144,9 @@ proc isingHeatBath*(lattice: var Lattice, rnd: var Rand): (float, float, float, 
           lattice[row, col] = 1
         else:
           lattice[row, col] = -1
-        #[ lattice.flip(row, col)
-        let newHamiltonian = calcHamiltonian(lattice)
-        let dEinner = newHamiltonian - innerhamiltonian
-        if dEinner > 0:
-          let r = rnd.rand(1.0)
-          #if iters < 10: echo -dEinner / (lattice.T * kb)
-          if r > exp(-dEinner / (lattice.T * kb)):
-            #echo "Rejected! ", dEinner
-            lattice.flip(row, col) # flip back
-          else:
-            innerHamiltonian = newHamiltonian
-        else:
-          innerhamiltonian = newHamiltonian ]#
-    if iters > 50:
-      innerHamiltonian = calcHamiltonian(lattice)
+    let innerHamiltonian = calcHamiltonian(lattice)
+    if iters > 3000 and iters mod 100 == 0:
+      let innerHamiltonian = calcHamiltonian(lattice)
       let M = M_calc(lattice)
       let msquare = M*M
       let m4 = msquare*msquare
