@@ -76,8 +76,9 @@ proc plotData(y: seq[seq[float]], x: seq[float], E: seq[float], filename, title,
   var df = seqsToDf({"b": x, fmt"E = {E[0]:6.3f}": y[0]})
   var columnNames: seq[string] = @[fmt"E = {E[0]:6.3f}"]
   for i in 1 .. y.high:
-    df = innerJoin(df, seqsToDf({"b": x, fmt"E = {E[i]:6.3f}": y[i]}), by = "b")
-    columnNames.add fmt"E = {E[i]:6.3f}"
+    let colName = fmt"E = {E[i]:6.3f}"
+    df[colName] = y[i]
+    columnNames.add colName
 
   df = df.gather(columnNames, key="Energy", value=yLabel)
 
