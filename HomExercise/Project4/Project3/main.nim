@@ -36,13 +36,13 @@ proc main() =
 
 #SIZE 8
   echo "Running for size 8"
-  let c_len = 40
+  let c_len = 50
   var avgheat1: seq[float] = newSeq[float](c_len)
   var avgsus1: seq[float] = newSeq[float](c_len)
   var avgcumul1: seq[float] = newSeq[float](c_len)
   var avgM1: seq[float] = newSeq[float](c_len)
   var cs = linspace(1.0,6.0,c_len).reversed
-  let times_run = 6 # 550 = 7h
+  let times_run = 5600 # 550 = 7h
   var latticeZise = 8
   var nthreads = countProcessors()
   var tp = Taskpool.new(num_threads = nthreads)
