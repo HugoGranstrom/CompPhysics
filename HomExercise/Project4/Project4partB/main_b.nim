@@ -20,7 +20,7 @@ proc thread_func*(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHe
     
     lattice.T = T
     #echo lattice.calcHamiltonian
-    let (M,msquare,m4,e,esquare) = isingHeatBath(lattice, rnd)
+    let (M,msquare,m4,e,esquare, _) = isingHeatBath(lattice, rnd)
     #echo lattice.calcHamiltonian
     let specHeat = Heat_calc(e,esquare,T)
     let sus = Sus_calc(M,msquare,T)
@@ -47,7 +47,7 @@ proc main() =
   var avgcumul1: seq[float] = newSeq[float](c_len)
   var avgM1: seq[float] = newSeq[float](c_len)
   var cs = linspace(-6,-0.1,c_len).reversed
-  let times_run = 6 * 2000 # 1440 = 8h
+  let times_run = 6 * 1 # 1440 = 8h
   var latticeZise = 8
   var nthreads = countProcessors()
   var tp = Taskpool.new(num_threads = nthreads)
@@ -139,5 +139,7 @@ proc main() =
     ggtitle("Specific Heat") +
     ggsave("heat.png")
   dfall.writeCsv("test.csv")
+
+
 
 main()

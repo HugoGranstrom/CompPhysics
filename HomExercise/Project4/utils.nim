@@ -1,4 +1,4 @@
-import math, random, sequtils, ggplotnim, numericalnim
+import math, random, sequtils, ggplotnim, numericalnim, ginger, strformat, algorithm
 import locks, taskpools, cpuinfo
 
 type
@@ -70,9 +70,11 @@ proc Cumulant*(mSquare: float, m4: float): float =
 proc mean*(x: seq[float]): float =
   return sum(x)/x.len.float
 
-const mcIterations = 10000
+const mcIterations = 500
+const startSaving = 0
+const saveEvery = 1
 
-proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, float) =
+proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, float, seq[float]) =
   var hamiltonian = calcHamiltonian(lattice)
   var dE = 1e10
   var eTot: seq[float]
@@ -98,7 +100,7 @@ proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, f
             #echo "Rejected! ", dEinner
             lattice.flip(row, col) # flip back
     let innerHamiltonian = lattice.calcHamiltonian
-    if iters > 3000 and iters mod 100 == 0:
+    if iters > startSaving and iters mod saveEvery == 0:
       let M = M_calc(lattice)
       let msquare = M*M
       let m4 = msquare*msquare
@@ -118,7 +120,7 @@ proc ising*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, f
   let e = mean(eTot)
   let esquare = mean(esquareTot)
   #echo "Iterations: ", iters
-  return (M,msquare,m4,e,esquare)
+  return (M,msquare,m4,e,esquare, eTot)
   
 
 proc calcProbability*(lattice: Lattice, row, col: int): float =
@@ -127,7 +129,7 @@ proc calcProbability*(lattice: Lattice, row, col: int): float =
   let e = exp(2 * lattice.J * beta * s)
   result = e / (1 + e)
 
-proc isingHeatBath*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, float) =
+proc isingHeatBath*(lattice: var Lattice, rnd: var Rand): (float, float, float, float, float, seq[float]) =
   var hamiltonian = calcHamiltonian(lattice)
   var dE = 1e10
   var eTot: seq[float]
@@ -145,7 +147,7 @@ proc isingHeatBath*(lattice: var Lattice, rnd: var Rand): (float, float, float, 
         else:
           lattice[row, col] = -1
     let innerHamiltonian = calcHamiltonian(lattice)
-    if iters > 3000 and iters mod 100 == 0:
+    if iters > startSaving and iters mod saveEvery == 0:
       let innerHamiltonian = calcHamiltonian(lattice)
       let M = M_calc(lattice)
       let msquare = M*M
@@ -166,4 +168,83 @@ proc isingHeatBath*(lattice: var Lattice, rnd: var Rand): (float, float, float, 
   let e = mean(eTot)
   let esquare = mean(esquareTot)
   
-  return (M,msquare,m4,e,esquare)
+  return (M,msquare,m4,e,esquare, eTot)
+
+proc produceSpinPlots*(isingModel: proc (lattice: var Lattice, rnd: var Rand): (float, float, float, float, float, seq[float]), lattice: Lattice, cs: seq[float], fileName: string) =
+  # Tile plot for different values of c
+  var rnd = initRand(1337)
+  var latticeList: seq[Lattice]
+  latticeList.add lattice
+  
+  var tempLattice = lattice # reuse this so the end state of one iteration is used as start state of the next one.
+  for c in cs:
+    let T = tempLattice.J * c / kb
+    tempLattice.T = T
+
+    let _ = isingModel(tempLattice, rnd)
+    latticeList.add tempLattice
+  
+  let plotWidth = 300.0
+  let plotHeight = 300.0
+  var subPlots: seq[PlotView]
+  for i, latt in latticeList:
+    var xs, ys: seq[int]
+    var spins: seq[int]
+    for x in 0 ..< latt.width:
+      for y in 0 ..< latt.height:
+        xs.add x
+        ys.add y
+        spins.add latt[x, y].toInt
+    let df = toDf({"spin": spins, "x": xs, "y": ys})
+    try:
+      subPlots.add ggcreate(
+        ggplot(df, aes("x", "y", fill="spin"), backend=bkCairo) +
+          geom_tile() +
+          hideLegend() +
+          scale_fill_gradient(magma()) +
+          xlim(0, 32) +
+          ylim(0, 32) +
+          ggtitle(if i == 0: "Initial state" else: fmt"Final state (c = {cs[i-1]:2.2f})"),
+        width = plotWidth, height=plotHeight
+      )
+    except ValueError:
+      discard
+  let gridSize = sqrt(float(cs.len + 1)).ceil
+  var plt = initViewport(wImg = plotWidth*gridSize, hImg = plotHeight*gridSize, backend = bkCairo, name="Hello world!")
+  plt.layout(gridSize.toInt, gridSize.toInt)
+  for i in 0 .. subPlots.high:
+    plt.embedAt(i, subPlots[i].view)
+  plt.draw(filename)
+
+proc plotEnergyIntervals*(lattice: Lattice, c: float, filename: string) =
+  var df = newDataFrame()
+  for (p, name) in [(ising, "metropolis"), (isingHeatBath, "heat bath")]:
+    var startLattice = lattice
+    let T = startLattice.J * c / kb
+    startLattice.T = T
+    var rnd = initRand(1337)
+    let (M,msquare,m4,e,esquare, eTot) = p(startLattice, rnd)
+    df[name] = eTot
+  df["Iterations"] = linspace(startSaving.float, mcIterations.float, df.len)
+  df = df.gather(["metropolis", "heat bath"], value="Energy", key="Method")
+  ggplot(df, aes("Iterations", "Energy", color="Method")) +
+    geom_line() +
+    ggtitle("Energy against number of iterations for Metropolis and heat bath") +
+    ggsave(filename)
+
+
+
+
+
+when isMainModule:
+  var rnd = initRand(1338)
+  let startLattice = newLattice(32, 32, 0.000189574, 0.0, rnd)
+  let cs = linspace(1.0, 5.0, 8).reversed
+  produceSpinPlots(ising, startLattice, cs, "metropolis.png")
+  produceSpinPlots(isingHeatBath, startLattice, cs, "heatbath.png")
+  plotEnergyIntervals(startLattice, 1.0, "metroVSheat4.png")
+
+  # Energy plot as function of iterations?
+
+
+  

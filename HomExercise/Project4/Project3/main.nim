@@ -17,7 +17,7 @@ proc thread_func(task_id: int, c_len: int, cs: ptr UncheckedArray[float], avgHea
     lattice.T = T
     
     #echo lattice.calcHamiltonian
-    let (M,msquare,m4,e,esquare) = ising(lattice, rnd)
+    let (M,msquare,m4,e,esquare, _) = ising(lattice, rnd)
     #echo lattice.calcHamiltonian
     let specHeat = Heat_calc(e,esquare,T)
     let sus = Sus_calc(M,msquare,T)
