@@ -170,51 +170,39 @@ proc isingHeatBath*(lattice: var Lattice, rnd: var Rand): (float, float, float, 
   
   return (M,msquare,m4,e,esquare, eTot)
 
-proc produceSpinPlots*(isingModel: proc (lattice: var Lattice, rnd: var Rand): (float, float, float, float, float, seq[float]), lattice: Lattice, cs: seq[float], fileName: string) =
+proc produceSpinPlots*(isingModel: proc (lattice: var Lattice, rnd: var Rand): (float, float, float, float, float, seq[float]), lattice: Lattice, cs: seq[float], fileName: string, title: string) =
   # Tile plot for different values of c
   var rnd = initRand(1337)
-  var latticeList: seq[Lattice]
-  latticeList.add lattice
-  
+  var df = newDataFrame()
+  var xs, ys: seq[int]
+  for x in 0 ..< lattice.width-1:
+    for y in 0 ..< lattice.height-1:
+      xs.add x
+      ys.add y
+  df["x"] = xs
+  df["y"] = ys
+  df["Initial State"] = lattice.data
+  var colNames = @["Initial State"]
+
   var tempLattice = lattice # reuse this so the end state of one iteration is used as start state of the next one.
   for c in cs:
     let T = tempLattice.J * c / kb
     tempLattice.T = T
 
     let _ = isingModel(tempLattice, rnd)
-    latticeList.add tempLattice
+    let colName = fmt"c = {c:2.2f}"
+    df[colName] = tempLattice.data
+    colNames.add colName
   
-  let plotWidth = 300.0
-  let plotHeight = 300.0
-  var subPlots: seq[PlotView]
-  for i, latt in latticeList:
-    var xs, ys: seq[int]
-    var spins: seq[int]
-    for x in 0 ..< latt.width:
-      for y in 0 ..< latt.height:
-        xs.add x
-        ys.add y
-        spins.add latt[x, y].toInt
-    let df = toDf({"spin": spins, "x": xs, "y": ys})
-    try:
-      subPlots.add ggcreate(
-        ggplot(df, aes("x", "y", fill="spin"), backend=bkCairo) +
-          geom_tile() +
-          hideLegend() +
-          scale_fill_gradient(magma()) +
-          xlim(0, 32) +
-          ylim(0, 32) +
-          ggtitle(if i == 0: "Initial state" else: fmt"Final state (c = {cs[i-1]:2.2f})"),
-        width = plotWidth, height=plotHeight
-      )
-    except ValueError:
-      discard
-  let gridSize = sqrt(float(cs.len + 1)).ceil
-  var plt = initViewport(wImg = plotWidth*gridSize, hImg = plotHeight*gridSize, backend = bkCairo, name="Hello world!")
-  plt.layout(gridSize.toInt, gridSize.toInt)
-  for i in 0 .. subPlots.high:
-    plt.embedAt(i, subPlots[i].view)
-  plt.draw(filename)
+  df = df.gather(colNames, value="spin", key="state")
+  ggplot(df, aes("x", "y")) +
+    scale_fill_discrete() +
+    geom_tile(aes(fill="spin")) +
+    scale_fill_gradient(magma()) +
+    facet_wrap("state") +
+    hideLegend() +
+    ggtitle(title) +
+    ggsave(filename)
 
 proc plotEnergyIntervals*(lattice: Lattice, c: float, filename: string) =
   var df = newDataFrame()
@@ -240,9 +228,9 @@ when isMainModule:
   var rnd = initRand(1338)
   let startLattice = newLattice(32, 32, 0.000189574, 0.0, rnd)
   let cs = linspace(1.0, 5.0, 8).reversed
-  produceSpinPlots(ising, startLattice, cs, "metropolis.png")
-  produceSpinPlots(isingHeatBath, startLattice, cs, "heatbath.png")
-  plotEnergyIntervals(startLattice, 1.0, "metroVSheat4.png")
+  produceSpinPlots(isingHeatBath, startLattice, cs, "heatbath.png", "Spin configurations for different c using heat bath")
+  produceSpinPlots(ising, startLattice, cs, "metropolis.png", "Spin configurations for different c using Metropolis")
+  plotEnergyIntervals(startLattice, 1.0, "metroVSheat.png")
 
   # Energy plot as function of iterations?
 
